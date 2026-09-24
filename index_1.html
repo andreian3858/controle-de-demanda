@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1B2A41">
+<title>Controle de Demandas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Figtree:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* =================== TOKENS =================== */
+  :root {
+    --bg: #EEF2F6; --surface: #FFFFFF; --ink: #1B2A41; --muted: #5B6B82; --line: #D5DDE7;
+    --accent: #1B2A41; --accent-ink: #FFFFFF;
+    --aberto: #D1435B;     --aberto-tint: #FBE9EC;
+    --andamento: #B97800;  --andamento-tint: #FDF3DC;
+    --resolvido: #1D6FB8;  --resolvido-tint: #E3EEFA;
+    --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+    --body: "Figtree", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+    --radius-lg: 14px; --radius-sm: 8px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0F1726; --surface: #17223A; --ink: #E6ECF5; --muted: #93A3BA; --line: #27364F;
+      --accent: #E6ECF5; --accent-ink: #0F1726;
+      --aberto: #F07A8E;    --aberto-tint: #3A1E2A;
+      --andamento: #F2B544; --andamento-tint: #3A2F17;
+      --resolvido: #6FB1F2; --resolvido-tint: #172E4A;
+    }
+  }
+
+  /* =================== BASE =================== */
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 var(--body);
+    padding: env(safe-area-inset-top, 0) env(safe-area-inset-right, 0) env(safe-area-inset-bottom, 0) env(safe-area-inset-left, 0);
+  }
+  button, select, textarea, input { font: inherit; color: inherit; }
+  :focus-visible { outline: 3px solid var(--resolvido); outline-offset: 2px; }
+  [hidden] { display: none !important; }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 16px; }
+  body.travado { overflow: hidden; }
+
+  /* =================== CABEÇALHO =================== */
+  header.top { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 8px 0 20px; }
+  h1 { font: 800 clamp(1.6rem, 6vw, 2.2rem)/1.05 var(--display); letter-spacing: -0.02em; margin: 0; }
+  .tools { display: flex; align-items: center; gap: 10px; }
+  .sync { display: flex; align-items: center; gap: 8px; font-size: .85rem; color: var(--muted); }
+  .sync .dot { width: 8px; height: 8px; border-radius: 50%; background: #22865A; flex: none; }
+  .sync.busy .dot { background: var(--andamento); animation: pulse 1s infinite; }
+  .sync.error .dot { background: var(--aberto); }
+  @keyframes pulse { 50% { opacity: .3; } }
+  .icon-btn {
+    border: 1px solid var(--line); background: var(--surface); border-radius: 999px;
+    width: 40px; height: 40px; display: grid; place-items: center; cursor: pointer; flex: none;
+  }
+  .icon-btn svg { width: 18px; height: 18px; }
+
+  /* =================== ENTRADA (CÓDIGO) =================== */
+  .panel {
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg);
+    padding: 28px 20px; max-width: 420px; margin: 24px auto;
+  }
+  .panel h2 { font: 700 1.3rem/1.2 var(--display); margin: 0 0 6px; }
+  .panel p { color: var(--muted); margin: 0 0 18px; }
+  .panel input {
+    width: 100%; padding: 12px; font-size: 18px; letter-spacing: .04em;
+    border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--bg);
+  }
+  .panel .btn-primary { width: 100%; margin-top: 12px; }
+  .panel .erro { color: var(--aberto); font-size: .9rem; margin: 10px 0 0; }
+  .setup { background: var(--aberto-tint); border: 1px solid var(--aberto); border-radius: var(--radius-lg); padding: 16px; margin-bottom: 16px; }
+
+  /* =================== LAYOUT =================== */
+  .layout { display: grid; gap: 20px; }
+  @media (min-width: 900px) {
+    .layout { grid-template-columns: 340px 1fr; align-items: start; gap: 32px; }
+    .side { position: sticky; top: 16px; }
+  }
+
+  /* =================== CRIAÇÃO =================== */
+  .composer { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 16px; }
+  .composer label { display: block; font-weight: 600; margin-bottom: 8px; }
+  .composer textarea, .sheet textarea {
+    width: 100%; min-height: 96px; resize: vertical; padding: 12px; font-size: 16px;
+    background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-sm);
+  }
+  .composer .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; }
+  .hint { font-size: .8rem; color: var(--muted); }
+  @media (hover: none) { .hint { display: none; } }
+  .btn-primary {
+    background: var(--accent); color: var(--accent-ink); border: 0; border-radius: var(--radius-sm);
+    padding: 12px 18px; font-weight: 600; cursor: pointer; min-height: 44px; margin-left: auto;
+  }
+  .btn-primary:disabled { opacity: .55; cursor: wait; }
+  .btn-sec {
+    background: transparent; border: 1px solid var(--line); border-radius: var(--radius-sm);
+    padding: 12px 18px; font-weight: 600; cursor: pointer; min-height: 44px;
+  }
+  .link-btn { background: none; border: 0; color: var(--muted); cursor: pointer; padding: 12px 0 0; font-size: .85rem; text-decoration: underline; }
+  .papel { font-size: .85rem; color: var(--muted); margin: 14px 0 0; display: flex; align-items: center; gap: 6px; }
+  .papel b { color: var(--ink); }
+
+  .field-select, .resp-select {
+    appearance: none; -webkit-appearance: none; font-size: 16px; cursor: pointer;
+    background: var(--bg) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%235B6B82' stroke-width='2' fill='none'/%3E%3C/svg%3E") no-repeat right 12px center;
+    border: 1px solid var(--line); color: var(--ink);
+  }
+  .field-select { width: 100%; padding: 10px 34px 10px 12px; border-radius: var(--radius-sm); }
+  .composer .lbl-resp { margin-top: 12px; }
+  .side .field-select { margin-top: 12px; background-color: var(--surface); }
+
+  /* =================== FILTROS =================== */
+  .filters { display: flex; gap: 8px; overflow-x: auto; padding: 16px 0 4px; scrollbar-width: none; }
+  .filters::-webkit-scrollbar { display: none; }
+  @media (min-width: 900px) { .filters { flex-direction: column; overflow: visible; } }
+  .chip {
+    display: flex; align-items: center; gap: 10px; justify-content: space-between;
+    border: 1px solid var(--line); background: var(--surface); border-radius: 999px;
+    padding: 8px 14px; cursor: pointer; white-space: nowrap; min-height: 40px;
+  }
+  @media (min-width: 900px) { .chip { border-radius: var(--radius-sm); } }
+  .chip .sw { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); }
+  .chip[data-f="Em Aberto"] .sw { background: var(--aberto); }
+  .chip[data-f="Em Andamento"] .sw { background: var(--andamento); }
+  .chip[data-f="Resolvido"] .sw { background: var(--resolvido); }
+  .chip .lbl { display: flex; align-items: center; gap: 8px; }
+  .chip .n { font: 600 .85rem var(--display); color: var(--muted); }
+  .chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .chip[aria-pressed="true"] .n { color: inherit; }
+  .search {
+    width: 100%; margin-top: 12px; padding: 10px 12px; font-size: 16px;
+    border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface);
+  }
+
+  /* =================== CARTÕES =================== */
+  .list { display: grid; gap: 12px; }
+  .card {
+    --c: var(--aberto); --t: var(--aberto-tint);
+    display: grid; grid-template-columns: 84px 1fr;
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden;
+  }
+  .card.s-andamento { --c: var(--andamento); --t: var(--andamento-tint); }
+  .card.s-resolvido { --c: var(--resolvido); --t: var(--resolvido-tint); }
+  .stub {
+    background: var(--t); color: var(--c);
+    border-right: 2px dashed color-mix(in srgb, var(--c) 45%, transparent);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 12px 6px; text-align: center;
+  }
+  .stub .num { font: 800 2.1rem/1 var(--display); letter-spacing: -0.03em; }
+  .stub .unit { font-size: .72rem; line-height: 1.2; margin-top: 4px; font-weight: 600; }
+  .body { padding: 14px 14px 12px; min-width: 0; }
+  .desc { margin: 0 0 8px; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .card.s-resolvido .desc { color: var(--muted); }
+  .meta { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: .82rem; color: var(--muted); }
+  .meta b { color: var(--ink); font-weight: 600; }
+
+  .note {
+    margin-top: 10px; padding: 8px 12px; background: var(--bg); border-radius: var(--radius-sm);
+    border-left: 3px solid var(--andamento); font-size: .92rem;
+  }
+  .note.solucao { border-left-color: var(--resolvido); }
+  .note .nl { display: block; font-size: .72rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+  .note p { margin: 2px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+  .foot { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; margin-top: 12px; }
+  .status-select {
+    appearance: none; -webkit-appearance: none;
+    background: var(--t) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%235B6B82' stroke-width='2' fill='none'/%3E%3C/svg%3E") no-repeat right 12px center;
+    color: var(--c); font-weight: 600; border: 1px solid color-mix(in srgb, var(--c) 40%, transparent);
+    border-radius: 999px; padding: 8px 34px 8px 14px; min-height: 40px; cursor: pointer; font-size: 16px;
+  }
+  .status-select:disabled, .resp-select:disabled { opacity: .6; cursor: wait; }
+  .status-lock {
+    display: inline-flex; align-items: center; gap: 6px; min-height: 40px;
+    background: var(--t); color: var(--c); font-weight: 600; border-radius: 999px; padding: 8px 14px;
+    border: 1px solid color-mix(in srgb, var(--c) 40%, transparent);
+  }
+  .status-lock svg { width: 14px; height: 14px; }
+  .resp-select { border-radius: 999px; padding: 8px 34px 8px 14px; min-height: 40px; }
+  .resp-select.vazio { color: var(--muted); border-style: dashed; }
+  .resp-static { display: inline-flex; align-items: center; gap: 6px; font-size: .9rem; color: var(--muted); min-height: 40px; }
+  .resp-static svg { width: 15px; height: 15px; }
+  .mini-btn {
+    background: none; border: 1px solid var(--line); border-radius: 999px; min-height: 40px;
+    padding: 8px 14px; font-size: .88rem; cursor: pointer; color: var(--ink);
+  }
+  .saving { font-size: .8rem; color: var(--muted); }
+  .empty { border: 2px dashed var(--line); border-radius: var(--radius-lg); padding: 32px 20px; text-align: center; color: var(--muted); }
+
+  /* =================== JANELA (andamento / resolução) =================== */
+  .modal {
+    position: fixed; inset: 0; z-index: 20; background: rgba(15, 23, 38, .55);
+    display: flex; align-items: flex-end; justify-content: center;
+  }
+  @media (min-width: 600px) { .modal { align-items: center; padding: 16px; } }
+  .sheet {
+    background: var(--surface); width: 100%; max-width: 520px;
+    border-radius: 18px 18px 0 0; padding: 22px 18px calc(18px + env(safe-area-inset-bottom, 0px));
+    max-height: 92vh; overflow-y: auto;
+  }
+  @media (min-width: 600px) { .sheet { border-radius: 18px; } }
+  .sheet h2 { font: 700 1.25rem/1.2 var(--display); margin: 0 0 4px; }
+  .sheet .m-desc { color: var(--muted); margin: 0 0 16px; font-size: .92rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .sheet label { display: block; font-weight: 600; margin-bottom: 8px; }
+  .sheet .m-aviso { background: var(--resolvido-tint); color: var(--resolvido); border-radius: var(--radius-sm); padding: 10px 12px; font-size: .88rem; margin: 12px 0 0; }
+  .sheet .m-erro { color: var(--aberto); font-size: .88rem; margin: 8px 0 0; }
+  .m-acoes { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
+  .m-acoes .btn-primary { margin-left: 0; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    transform: translate(-50%, 20px); opacity: 0; pointer-events: none;
+    background: var(--ink); color: var(--bg); padding: 12px 18px; border-radius: var(--radius-sm);
+    max-width: calc(100% - 32px); transition: opacity .2s, transform .2s; z-index: 30;
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+  .toast.error { background: var(--aberto); color: #fff; }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>Controle de Demandas</h1>
+    <div class="tools" id="tools" hidden>
+      <div class="sync" id="sync" aria-live="polite"><span class="dot"></span><span id="syncText">Conectando…</span></div>
+      <button class="icon-btn" id="refreshBtn" title="Atualizar agora" aria-label="Atualizar agora">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <div id="setupMsg" class="setup" hidden>
+    <strong>Falta conectar a planilha.</strong> O endereço do Web App não foi configurado neste arquivo.
+  </div>
+
+  <!-- Entrada com código -->
+  <form class="panel" id="loginPanel" hidden autocomplete="off">
+    <h2>Entrar</h2>
+    <p>Digite o código da equipe. Você só precisa fazer isso uma vez neste aparelho.</p>
+    <label class="sr-only" for="codigo">Código</label>
+    <input id="codigo" type="password" placeholder="Código" required autocapitalize="off" autocorrect="off" spellcheck="false">
+    <button class="btn-primary" id="loginBtn" type="submit">Entrar</button>
+    <p class="erro" id="loginErro" hidden></p>
+  </form>
+
+  <!-- Aplicativo -->
+  <div class="layout" id="app" hidden>
+    <aside class="side">
+      <form class="composer" id="form" autocomplete="off">
+        <label for="descricao">O que precisa ser feito?</label>
+        <textarea id="descricao" maxlength="2000" placeholder="Ex.: Trocar a lâmpada da sala de reunião" required></textarea>
+        <div id="respNovoBox" hidden>
+          <label for="respNovo" class="lbl-resp">Com quem fica?</label>
+          <select id="respNovo" class="field-select"><option value="">Sem responsável</option></select>
+        </div>
+        <div class="row">
+          <span class="hint">Enter adiciona, Shift+Enter quebra linha</span>
+          <button class="btn-primary" id="addBtn" type="submit">Adicionar demanda</button>
+        </div>
+      </form>
+      <nav class="filters" id="filters" aria-label="Filtrar por status">
+        <button class="chip" data-f="Todas" aria-pressed="true"><span class="lbl"><span class="sw"></span>Todas</span><span class="n" id="n-Todas">0</span></button>
+        <button class="chip" data-f="Em Aberto" aria-pressed="false"><span class="lbl"><span class="sw"></span>Em aberto</span><span class="n" id="n-Em Aberto">0</span></button>
+        <button class="chip" data-f="Em Andamento" aria-pressed="false"><span class="lbl"><span class="sw"></span>Em andamento</span><span class="n" id="n-Em Andamento">0</span></button>
+        <button class="chip" data-f="Resolvido" aria-pressed="false"><span class="lbl"><span class="sw"></span>Resolvidas</span><span class="n" id="n-Resolvido">0</span></button>
+      </nav>
+      <label class="sr-only" for="search">Buscar demanda</label>
+      <input class="search" id="search" type="search" placeholder="Buscar pela descrição, nº ou nome">
+      <label class="sr-only" for="filtroResp">Filtrar por responsável</label>
+      <select id="filtroResp" class="field-select"><option value="">Todos os responsáveis</option></select>
+      <p class="papel" id="papel" hidden></p>
+      <button class="link-btn" id="logoutBtn" type="button">Sair deste aparelho</button>
+    </aside>
+    <main>
+      <div class="list" id="list" aria-live="polite"><div class="empty">Carregando demandas…</div></div>
+    </main>
+  </div>
+</div>
+
+<!-- Janela para descrever andamento / resolução -->
+<div class="modal" id="modal" hidden>
+  <form class="sheet" id="mForm" role="dialog" aria-modal="true" aria-labelledby="mTitulo" autocomplete="off">
+    <h2 id="mTitulo"></h2>
+    <p class="m-desc" id="mDesc"></p>
+    <label for="mTexto" id="mLabel"></label>
+    <textarea id="mTexto" maxlength="2000"></textarea>
+    <p class="m-erro" id="mErro" hidden></p>
+    <p class="m-aviso" id="mAviso" hidden>Depois de resolvida, a demanda não poderá ser reaberta.</p>
+    <div class="m-acoes">
+      <button type="button" class="btn-sec" id="mCancelar">Cancelar</button>
+      <button type="submit" class="btn-primary" id="mOk"></button>
+    </div>
+  </form>
+</div>
+
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+/* =====================================================================
+   CONFIGURAÇÃO — URL do seu Web App (termina em /exec)
+   ===================================================================== */
+const API_URL = 'https://script.google.com/macros/s/AKfycbzD-TxcSQIvV1LspthwMx6RpBCuvLQSW_5vH0l4AQ2geKKIwwTPMaLhUt8PT23p9WAw1Q/exec';
+
+const AUTO_REFRESH_SEGUNDOS = 30; // busca novidades da equipe a cada 30s
+
+/* =====================================================================
+   Daqui para baixo não é preciso alterar nada.
+   ===================================================================== */
+const STATUS = ['Em Aberto', 'Em Andamento', 'Resolvido'];
+const CLASS = { 'Em Aberto': 's-aberto', 'Em Andamento': 's-andamento', 'Resolvido': 's-resolvido' };
+// Para onde cada status pode ir (não existe volta)
+const PERMITIDOS = {
+  'Em Aberto': ['Em Aberto', 'Em Andamento', 'Resolvido'],
+  'Em Andamento': ['Em Andamento', 'Resolvido'],
+  'Resolvido': ['Resolvido']
+};
+const DAY = 86400000;
+const CHAVE = 'controle-demandas-codigo';
+const MSG_MUDOU = 'O código mudou. Digite o novo código.';
+const SEM_RESP = '__nenhum__';
+const ICONE_CADEADO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
+const ICONE_PESSOA = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>';
+
+let codigo = lerCodigo();
+let demandas = [], filtro = 'Todas', busca = '', pendentes = 0, iniciado = false;
+let responsaveis = [], filtroResp = '', admin = false;
+let janela = null; // { id, tipo: 'andamento' | 'resolver' | 'nota' }
+const salvando = new Set();
+const $ = (id) => document.getElementById(id);
+const configurado = API_URL && !API_URL.includes('COLE_AQUI');
+const podeAtualizarSozinho = () => pendentes === 0 && !janela && !$('app').hidden;
+
+/* ---------------- Código salvo no aparelho ---------------- */
+function lerCodigo() { try { return localStorage.getItem(CHAVE) || ''; } catch (_) { return ''; } }
+function salvarCodigo(c) { try { c ? localStorage.setItem(CHAVE, c) : localStorage.removeItem(CHAVE); } catch (_) {} }
+
+/* ---------------- Comunicação com o Google Sheets ---------------- */
+async function api(payload) {
+  const controle = new AbortController();
+  const limite = setTimeout(() => controle.abort(), 30000);
+  let json;
+  try {
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // evita o bloqueio de CORS do Google
+      body: JSON.stringify({ ...payload, codigo }),
+      signal: controle.signal
+    });
+    const texto = await res.text();
+    try { json = JSON.parse(texto); }
+    catch (_) { throw new Error('O Google respondeu com uma página em vez de dados. Confira se "Quem pode acessar" está como "Qualquer pessoa" e publique uma nova versão.'); }
+  } catch (e) {
+    if (e.name === 'AbortError') throw new Error('O Google demorou mais de 30 segundos para responder. Tente de novo.');
+    if (e instanceof TypeError) throw new Error('Sem resposta do Google. Confira sua internet.');
+    throw e;
+  } finally {
+    clearTimeout(limite);
+  }
+  if (!json.ok) {
+    const invalido = json.error === 'CODIGO_INVALIDO';
+    const err = new Error(invalido ? 'Código incorreto.' : (json.error || 'Erro na planilha'));
+    err.codigoInvalido = invalido;
+    throw err;
+  }
+  return json.data;
+}
+
+/* ---------------- Dados recebidos ---------------- */
+function normStatus(s) { return s === 'Fechado' ? 'Resolvido' : (STATUS.includes(s) ? s : 'Em Aberto'); }
+
+function aplicarDados(dados) {
+  const lista = Array.isArray(dados) ? dados : (dados.demandas || []);
+  const nomes = Array.isArray(dados) ? [] : (dados.responsaveis || []);
+  admin = !Array.isArray(dados) && !!dados.admin;
+
+  $('respNovoBox').hidden = !admin;
+  $('papel').hidden = !admin;
+  $('papel').innerHTML = admin ? `${ICONE_PESSOA}<span>Você entrou como <b>administrador</b></span>` : '';
+
+  if (nomes.join('|') !== responsaveis.join('|')) {
+    responsaveis = nomes;
+    const opts = responsaveis.map((n) => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+    const novo = $('respNovo'), escolhido = novo.value;
+    novo.innerHTML = '<option value="">Sem responsável</option>' + opts;
+    novo.value = responsaveis.includes(escolhido) ? escolhido : '';
+    const f = $('filtroResp');
+    f.innerHTML = '<option value="">Todos os responsáveis</option>' + opts + `<option value="${SEM_RESP}">Sem responsável</option>`;
+    f.value = (filtroResp === SEM_RESP || responsaveis.includes(filtroResp)) ? filtroResp : '';
+    filtroResp = f.value;
+  }
+  demandas = lista.map((d) => ({ andamento: '', solucao: '', responsavel: '', ...d, status: normStatus(d.status) }));
+}
+
+/* ---------------- Datas e contador de dias ---------------- */
+function inicioDoDia(d) { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; }
+function diasEntre(inicioIso, fim = new Date()) {
+  if (!inicioIso) return 0;
+  return Math.max(0, Math.round((inicioDoDia(fim) - inicioDoDia(inicioIso)) / DAY));
+}
+function fmtData(iso) {
+  if (!iso) return '';
+  const d = new Date(iso), hoje = inicioDoDia(new Date()), dia = inicioDoDia(d);
+  const hora = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  if (+dia === +hoje) return 'hoje às ' + hora;
+  if (+dia === +hoje - DAY) return 'ontem às ' + hora;
+  return d.toLocaleDateString('pt-BR') + ' ' + hora;
+}
+
+/* ---------------- Tela ---------------- */
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function ordenar(lista) {
+  // Ativas primeiro (a mais antiga no topo); resolvidas depois (mais recente no topo)
+  return [...lista].sort((a, b) => {
+    const fa = a.status === 'Resolvido', fb = b.status === 'Resolvido';
+    if (fa !== fb) return fa ? 1 : -1;
+    if (fa) return new Date(b.dataResolucao) - new Date(a.dataResolucao);
+    return new Date(a.dataAbertura) - new Date(b.dataAbertura);
+  });
+}
+
+function respHTML(d, resolvido, ocupado) {
+  if (resolvido || !admin) {
+    return `<span class="resp-static">${ICONE_PESSOA}${esc(d.responsavel || 'Sem responsável')}</span>`;
+  }
+  const nomes = d.responsavel && !responsaveis.includes(d.responsavel) ? [...responsaveis, d.responsavel] : responsaveis;
+  return `<label class="sr-only" for="rp-${esc(d.id)}">Com quem fica a demanda ${esc(d.id)}</label>
+        <select class="resp-select ${d.responsavel ? '' : 'vazio'}" id="rp-${esc(d.id)}" data-id="${esc(d.id)}" ${ocupado ? 'disabled' : ''}>
+          <option value="" ${!d.responsavel ? 'selected' : ''}>Sem responsável</option>
+          ${nomes.map((n) => `<option value="${esc(n)}" ${n === d.responsavel ? 'selected' : ''}>${esc(n)}</option>`).join('')}
+        </select>`;
+}
+
+function cardHTML(d) {
+  const resolvido = d.status === 'Resolvido';
+  const dias = resolvido ? diasEntre(d.dataAbertura, d.dataResolucao || new Date()) : diasEntre(d.dataAbertura);
+  const unidade = resolvido ? (dias === 1 ? 'dia até resolver' : 'dias até resolver') : (dias === 1 ? 'dia aberta' : 'dias aberta');
+  const ocupado = salvando.has(d.id);
+  const statusCtl = resolvido
+    ? `<span class="status-lock" title="Demanda resolvida, não pode ser reaberta">${ICONE_CADEADO}Resolvido</span>`
+    : `<label class="sr-only" for="st-${esc(d.id)}">Status da demanda ${esc(d.id)}</label>
+        <select class="status-select" id="st-${esc(d.id)}" data-id="${esc(d.id)}" ${ocupado ? 'disabled' : ''}>
+          ${PERMITIDOS[d.status].map((s) => `<option value="${s}" ${s === d.status ? 'selected' : ''}>${s}</option>`).join('')}
+        </select>`;
+  return `
+  <article class="card ${CLASS[d.status]}">
+    <div class="stub" title="${resolvido ? 'Tempo total até a resolução' : 'Há quantos dias está aberta'}">
+      <span class="num">${dias}</span><span class="unit">${unidade}</span>
+    </div>
+    <div class="body">
+      <p class="desc">${esc(d.descricao)}</p>
+      <div class="meta">
+        <span><b>Nº ${esc(d.id)}</b></span>
+        <span>Aberta ${esc(fmtData(d.dataAbertura))}</span>
+        ${resolvido && d.dataResolucao ? `<span>Resolvida ${esc(fmtData(d.dataResolucao))}</span>` : ''}
+      </div>
+      ${d.andamento ? `<div class="note"><span class="nl">${resolvido ? 'Andamento' : 'O que está sendo feito'}</span><p>${esc(d.andamento)}</p></div>` : ''}
+      ${d.solucao ? `<div class="note solucao"><span class="nl">O que foi resolvido</span><p>${esc(d.solucao)}</p></div>` : ''}
+      <div class="foot">
+        ${statusCtl}
+        ${respHTML(d, resolvido, ocupado)}
+        ${d.status === 'Em Andamento' && !ocupado ? `<button class="mini-btn" data-nota="${esc(d.id)}" type="button">Atualizar andamento</button>` : ''}
+        ${ocupado ? '<span class="saving">Salvando…</span>' : ''}
+      </div>
+    </div>
+  </article>`;
+}
+
+function render() {
+  $('n-Todas').textContent = demandas.length;
+  STATUS.forEach((s) => { $('n-' + s).textContent = demandas.filter((d) => d.status === s).length; });
+  const termo = busca.trim().toLowerCase();
+  const visiveis = ordenar(demandas).filter((d) =>
+    (filtro === 'Todas' || d.status === filtro) &&
+    (!filtroResp || (filtroResp === SEM_RESP ? !d.responsavel : d.responsavel === filtroResp)) &&
+    (!termo || d.id === termo.replace('#', '') ||
+      [d.descricao, d.responsavel, d.andamento, d.solucao].some((t) => (t || '').toLowerCase().includes(termo)))
+  );
+  $('list').innerHTML = !demandas.length
+    ? '<div class="empty">Nenhuma demanda cadastrada ainda. Escreva a primeira no campo “O que precisa ser feito?”.</div>'
+    : !visiveis.length
+      ? '<div class="empty">Nenhuma demanda encontrada com este filtro.</div>'
+      : visiveis.map(cardHTML).join('');
+}
+
+function setSync(estado, texto) { $('sync').className = 'sync ' + (estado || ''); $('syncText').textContent = texto; }
+function agora() { return new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); }
+
+let toastTimer;
+function toast(msg, erro = false) {
+  const t = $('toast');
+  t.textContent = msg; t.className = 'toast show' + (erro ? ' error' : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => (t.className = 'toast'), erro ? 5000 : 2500);
+}
+
+/* ---------------- Entrar / sair ---------------- */
+function mostrarLogin(msgErro) {
+  codigo = ''; salvarCodigo(''); fecharJanela();
+  $('app').hidden = true; $('tools').hidden = true; $('loginPanel').hidden = false;
+  $('loginErro').hidden = !msgErro; $('loginErro').textContent = msgErro || '';
+  $('codigo').value = ''; $('codigo').focus();
+}
+
+function mostrarApp() {
+  $('loginPanel').hidden = true; $('app').hidden = false; $('tools').hidden = false;
+  if (!iniciado) {
+    iniciado = true;
+    setInterval(() => { if (!document.hidden && podeAtualizarSozinho()) carregar(true); }, AUTO_REFRESH_SEGUNDOS * 1000);
+    setInterval(() => { if (podeAtualizarSozinho()) render(); }, 60 * 1000); // contador de dias em tempo real
+  }
+}
+
+$('loginPanel').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const tentativa = $('codigo').value.trim();
+  if (!tentativa) return;
+  const btn = $('loginBtn');
+  btn.disabled = true; btn.textContent = 'Verificando…';
+  codigo = tentativa;
+  try {
+    aplicarDados(await api({ action: 'list' }));
+    salvarCodigo(codigo);
+    mostrarApp(); render();
+    setSync('', 'Atualizado ' + agora());
+  } catch (err) {
+    mostrarLogin(err.codigoInvalido ? 'Código incorreto. Confira com o responsável pela equipe.' : 'Não foi possível entrar. ' + err.message);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Entrar';
+  }
+});
+
+$('logoutBtn').addEventListener('click', () => { demandas = []; admin = false; mostrarLogin(); });
+
+/* ---------------- Carregar / adicionar ---------------- */
+async function carregar(silencioso = false) {
+  if (!silencioso) setSync('busy', 'Sincronizando…');
+  try {
+    const dados = await api({ action: 'list' });
+    if (pendentes === 0 && !janela) { aplicarDados(dados); render(); }
+    setSync('', 'Atualizado ' + agora());
+  } catch (e) {
+    console.error(e);
+    if (e.codigoInvalido) { mostrarLogin(codigo ? MSG_MUDOU : ''); return; }
+    setSync('error', 'Sem conexão');
+    if (!silencioso) {
+      toast('Não foi possível ler a planilha. ' + e.message, true);
+      if (!demandas.length) $('list').innerHTML = '<div class="empty">Não foi possível carregar as demandas. Toque no botão de atualizar para tentar de novo.</div>';
+    }
+  }
+}
+
+async function adicionar(ev) {
+  ev.preventDefault();
+  const campo = $('descricao'), descricao = campo.value.trim();
+  if (!descricao) { campo.focus(); return; }
+  const responsavel = admin ? $('respNovo').value : '';
+  const btn = $('addBtn');
+  campo.value = ''; $('respNovo').value = ''; // limpa na hora do clique
+  btn.disabled = true; btn.textContent = 'Adicionando…';
+  pendentes++; setSync('busy', 'Salvando…');
+  try {
+    const nova = await api({ action: 'create', descricao, responsavel, dataAbertura: new Date().toISOString() });
+    demandas.push({ andamento: '', solucao: '', ...nova, status: normStatus(nova.status) });
+    if (filtro === 'Resolvido') setFiltro('Todas');
+    render();
+    toast('Demanda adicionada');
+    setSync('', 'Atualizado ' + agora());
+  } catch (e) {
+    console.error(e);
+    if (e.codigoInvalido) { mostrarLogin(MSG_MUDOU); }
+    else {
+      if (!campo.value.trim()) { campo.value = descricao; $('respNovo').value = responsavel; }
+      toast('Não foi possível adicionar: ' + e.message, true); setSync('error', 'Erro ao salvar');
+    }
+  } finally {
+    pendentes--; btn.disabled = false; btn.textContent = 'Adicionar demanda';
+  }
+}
+
+/* ---------------- Salvar alterações de uma demanda ---------------- */
+async function salvar(id, payload, mudancas, msgOk) {
+  const d = demandas.find((x) => x.id === id);
+  if (!d) return;
+  const anterior = { ...d };
+  Object.assign(d, mudancas);
+  salvando.add(id); pendentes++; render(); setSync('busy', 'Salvando…');
+  try {
+    const r = await api({ action: 'update', id, ...payload });
+    Object.assign(d, r, { status: normStatus(r.status) });
+    toast(msgOk);
+    setSync('', 'Atualizado ' + agora());
+  } catch (e) {
+    console.error(e);
+    Object.assign(d, anterior); // desfaz na tela se não salvou
+    if (e.codigoInvalido) { mostrarLogin(MSG_MUDOU); }
+    else { toast('Não foi possível salvar: ' + e.message, true); setSync('error', 'Erro ao salvar'); }
+  } finally {
+    salvando.delete(id); pendentes--;
+    if (!$('app').hidden) { render(); if (pendentes === 0) carregar(true); }
+  }
+}
+
+function mudarStatus(id, novoStatus) {
+  const d = demandas.find((x) => x.id === id);
+  render(); // o menu volta ao status atual até a pessoa confirmar
+  if (!d || d.status === novoStatus) return;
+  if (!PERMITIDOS[d.status].includes(novoStatus)) return toast('Esta demanda não pode voltar para "' + novoStatus + '".', true);
+  abrirJanela(id, novoStatus === 'Resolvido' ? 'resolver' : 'andamento');
+}
+
+function mudarResponsavel(id, nome) {
+  const d = demandas.find((x) => x.id === id);
+  if (!admin || !d || d.status === 'Resolvido' || (d.responsavel || '') === nome) return render();
+  salvar(id, { responsavel: nome }, { responsavel: nome },
+    nome ? 'Demanda nº ' + id + ' agora está com ' + nome : 'Demanda nº ' + id + ' ficou sem responsável');
+}
+
+/* ---------------- Janela de andamento / resolução ---------------- */
+const TEXTOS_JANELA = {
+  andamento: { titulo: 'Colocar em andamento', label: 'O que está sendo feito?', ok: 'Salvar andamento', ph: 'Ex.: Orçamento pedido ao fornecedor, aguardando a peça chegar' },
+  nota:      { titulo: 'Atualizar andamento',  label: 'O que está sendo feito?', ok: 'Salvar',           ph: 'Ex.: Peça chegou, instalação marcada para amanhã' },
+  resolver:  { titulo: 'Resolver demanda',     label: 'O que foi resolvido?',    ok: 'Confirmar resolução', ph: 'Ex.: Trocada a bomba d’água por uma nova' }
+};
+
+function abrirJanela(id, tipo) {
+  const d = demandas.find((x) => x.id === id);
+  if (!d) return;
+  const t = TEXTOS_JANELA[tipo];
+  janela = { id, tipo };
+  $('mTitulo').textContent = t.titulo + ' — nº ' + d.id;
+  $('mDesc').textContent = d.descricao;
+  $('mLabel').textContent = t.label;
+  $('mTexto').placeholder = t.ph;
+  $('mTexto').value = tipo === 'resolver' ? '' : (d.andamento || '');
+  $('mOk').textContent = t.ok;
+  $('mAviso').hidden = tipo !== 'resolver';
+  $('mErro').hidden = true;
+  $('modal').hidden = false;
+  document.body.classList.add('travado');
+  setTimeout(() => $('mTexto').focus(), 50);
+}
+
+function fecharJanela() {
+  janela = null;
+  $('modal').hidden = true;
+  document.body.classList.remove('travado');
+}
+
+$('mForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  if (!janela) return;
+  const texto = $('mTexto').value.trim();
+  if (texto.length < 3) {
+    $('mErro').textContent = 'Escreva pelo menos algumas palavras.';
+    $('mErro').hidden = false; $('mTexto').focus();
+    return;
+  }
+  const { id, tipo } = janela;
+  fecharJanela();
+  if (tipo === 'resolver') {
+    const agoraIso = new Date().toISOString();
+    salvar(id, { status: 'Resolvido', solucao: texto, dataResolucao: agoraIso },
+      { status: 'Resolvido', solucao: texto, dataResolucao: agoraIso }, 'Demanda nº ' + id + ' resolvida');
+  } else if (tipo === 'andamento') {
+    salvar(id, { status: 'Em Andamento', andamento: texto }, { status: 'Em Andamento', andamento: texto }, 'Demanda nº ' + id + ' em andamento');
+  } else {
+    salvar(id, { andamento: texto }, { andamento: texto }, 'Andamento atualizado');
+  }
+});
+$('mCancelar').addEventListener('click', fecharJanela);
+$('modal').addEventListener('click', (e) => { if (e.target === $('modal')) fecharJanela(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && janela) fecharJanela(); });
+
+function setFiltro(f) {
+  filtro = f;
+  document.querySelectorAll('.chip').forEach((c) => c.setAttribute('aria-pressed', String(c.dataset.f === f)));
+  render();
+}
+
+/* ---------------- Eventos ---------------- */
+$('form').addEventListener('submit', adicionar);
+$('descricao').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey && matchMedia('(hover: hover)').matches) { e.preventDefault(); $('form').requestSubmit(); }
+});
+$('list').addEventListener('change', (e) => {
+  if (e.target.classList.contains('status-select')) mudarStatus(e.target.dataset.id, e.target.value);
+  if (e.target.classList.contains('resp-select')) mudarResponsavel(e.target.dataset.id, e.target.value);
+});
+$('list').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-nota]');
+  if (b) abrirJanela(b.dataset.nota, 'nota');
+});
+$('filters').addEventListener('click', (e) => { const c = e.target.closest('.chip'); if (c) setFiltro(c.dataset.f); });
+$('search').addEventListener('input', (e) => { busca = e.target.value; render(); });
+$('filtroResp').addEventListener('change', (e) => { filtroResp = e.target.value; render(); });
+$('refreshBtn').addEventListener('click', () => carregar());
+document.addEventListener('visibilitychange', () => { if (!document.hidden && podeAtualizarSozinho()) carregar(true); });
+
+/* ---------------- Início ---------------- */
+if (!configurado) {
+  $('setupMsg').hidden = false;
+} else if (!codigo) {
+  mostrarLogin();
+} else {
+  mostrarApp();
+  carregar();
+}
+</script>
+</body>
+</html>
